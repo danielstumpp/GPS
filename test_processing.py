@@ -18,9 +18,9 @@ def main():
 			data = line.split(',')
 
 			# Exit if GPS didn't get a fix
-			# if data[5] != 1:
-			# 	print "Error: no fix"
-			# 	quit()
+			if data[5] != 1:
+				print "Error: no fix"
+				quit()
 			
 			# Read GPS data about transceiver location
 			tx_lat  = data[1] + data[2]
