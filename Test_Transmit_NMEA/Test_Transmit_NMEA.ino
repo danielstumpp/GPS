@@ -1,15 +1,9 @@
 // LoRa 9x_TX
 // -*- mode: C++ -*-
-// Example sketch showing how to create a simple messaging client (transmitter)
-// with the RH_RF95 class. RH_RF95 class does not provide for addressing or
-// reliability, so you should only use RH_RF95 if you do not need the higher
-// level messaging abilities.
-// It is designed to work with the other example LoRa9x_RX
  
 #include <SPI.h>
 #include <RH_RF95.h>
 #include <SoftwareSerial.h>
-
  
 #define RFM95_CS  4
 #define RFM95_RST 2
@@ -18,89 +12,86 @@
 #define GPS_TX 7
 #define GPS_RX 8
  
-// Change to 434.0 or other frequency, must match RX's freq!
 #define RF95_FREQ 433.0
  
-// Singleton instance of the radio driver
+// radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
+#define PACKET_SIZE 82
+char packet[PACKET_SIZE];
 String gpsBuffer;
 char byteIn;
+bool transmitReady;
+
+// gps serial
 SoftwareSerial GPS(GPS_TX, GPS_RX);
  
 void setup() 
 {
+  // initialize pins
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
  
+  // wait for serial
   while (!Serial);
-  Serial.begin(9600);
+  Serial.begin(9600); // start serial
   delay(100);
 
-  GPS.begin(9600);
+  GPS.begin(9600); // start gps
   delay(100);
- 
-  Serial.println("Arduino LoRa TX Test!");
  
   // manual reset
   digitalWrite(RFM95_RST, LOW);
   delay(10);
   digitalWrite(RFM95_RST, HIGH);
   delay(10);
- 
+
+  // init and check radio systems
+
   while (!rf95.init()) {
     Serial.println("LoRa radio init failed");
     while (1);
   }
   Serial.println("LoRa radio init OK!");
  
-  // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM
   if (!rf95.setFrequency(RF95_FREQ)) {
     Serial.println("setFrequency failed");
     while (1);
   }
   Serial.print("Set Freq to: "); Serial.println(RF95_FREQ);
-  
-  // Defaults after init are 434.0MHz, 13dBm, Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on
  
-  // The default transmitter power is 13dBm, using PA_BOOST.
-  // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
-  // you can set transmitter powers from 5 to 23 dBm:
+  // Set transmit power to 23 dBm
   rf95.setTxPower(23, false);
-  Serial.println("Power set to 23");
 
-  Serial.println("begin listen");
-  GPS.listen();
+  transmitReady = false;
+  gpsBuffer.reserve(82); // allocate memory
+  GPS.listen(); // start listening
 }
 
-bool transmitReady = false;
-char packet[82];
- 
-int16_t packetnum = 0;  // packet counter, we increment per xmission
- 
 void loop()
 {
-  //Serial.println("loop");
+  // GPS Reading
   while (GPS.available()) {
-    //Serial.println("reading from gps");
-    byteIn = GPS.read();
-    gpsBuffer += char(byteIn);
-    if (byteIn == '\n') {
-      transmitReady = true;
+    byteIn = GPS.read(); // read 1 byte
+    gpsBuffer += char(byteIn); // add byte to buffer
+    if (byteIn == '\n') { // end of line
+      transmitReady = true; // ready to transmit
     }
   }
 
+  // Transmitting
   if (transmitReady) {
-    if (gpsBuffer.startsWith("$GPGGA"))
+    if (gpsBuffer.startsWith("$GPGGA")) // only transmit what's needed
     {
-       Serial.println("sending to rf95");
-      gpsBuffer.toCharArray(packet, 82);
-      packet[81] = 0;
+      gpsBuffer.toCharArray(packet, PACKET_SIZE); // copy gps data to packet
+      packet[PACKET_SIZE - 1] = 0; // null terminate the packet
   
-      Serial.print("sending "); Serial.println(packet);
-      rf95.send((uint8_t*)packet, 82);
-      rf95.waitPacketSent();
-  
+      Serial.print("PACKET: ");
+      Serial.println(packet);
+      rf95.send((uint8_t*)packet, PACKET_SIZE); // cast pointer to unsigned character and send
+      rf95.waitPacketSent(); // wait for send to finish
+      
+      // check for a response
       uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
       uint8_t len = sizeof(buf);
       Serial.println("Waiting for reply..."); delay(10);
@@ -108,7 +99,7 @@ void loop()
       { 
         // Should be a reply message for us now   
         if (rf95.recv(buf, &len))
-       {
+        {
           Serial.print("Got reply: ");
           Serial.println((char*)buf);
           Serial.print("RSSI: ");
@@ -128,49 +119,9 @@ void loop()
     } else {
       Serial.println("none");
     }
-    delay(1000);
-    gpsBuffer = "";
-    transmitReady = false;
+
+    delay(1000); // breathing room
+    gpsBuffer = ""; // clear gps buffer
+    transmitReady = false; // read more gps data
   }
 }
-  
-  /*
-  Serial.println("Sending to rf95_server");
-  // Send a message to rf95_server
-  
-  char radiopacket[20] = "Hello World #      ";
-  itoa(packetnum++, radiopacket+13, 10);
-  Serial.print("Sending "); Serial.println(radiopacket);
-  radiopacket[19] = 0;
-  
-  Serial.println("Sending..."); delay(10);
-  rf95.send((uint8_t *)radiopacket, 20);
- 
-  Serial.println("Waiting for packet to complete..."); delay(10);
-  rf95.waitPacketSent();
-  // Now wait for a reply
-  uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
-  uint8_t len = sizeof(buf);
- 
-  Serial.println("Waiting for reply..."); delay(10);
-  if (rf95.waitAvailableTimeout(1000))
-  { 
-    // Should be a reply message for us now   
-    if (rf95.recv(buf, &len))
-   {
-      Serial.print("Got reply: ");
-      Serial.println((char*)buf);
-      Serial.print("RSSI: ");
-      Serial.println(rf95.lastRssi(), DEC);    
-    }
-    else
-    {
-      Serial.println("Receive failed");
-    }
-  }
-  else
-  {
-    Serial.println("No reply, is there a listener around?");
-  }
-  delay(1000);
-}*/
