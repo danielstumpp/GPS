@@ -9,18 +9,25 @@
 #include <SPI.h>
 #include <RH_RF95.h>
 
-#define RFM95_CS 10
-#define RFM95_RST 9
-#define RFM95_INT 2
+#define RFM95_CS 4
+#define RFM95_RST 2
+#define RFM95_INT 3
+
+#define TLED 8
 
 // Change to 434.0 or other frequency, must match RX's freq!
-#define RF95_FREQ 915.0
+#define RF95_FREQ 433.0
 
 // Singleton instance of the radio driver
 RH_RF95 rf95(RFM95_CS, RFM95_INT);
 
 void setup() 
 {
+  pinMode(TLED, OUTPUT);
+  digitalWrite(TLED, HIGH);
+  delay(500);
+  digitalWrite(TLED, LOW);
+  
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
 
@@ -86,6 +93,17 @@ void loop()
    {
       Serial.print("Got reply: ");
       Serial.println((char*)buf);
+      String str((char*)buf);
+      if (str.startsWith("$GPGGA")) {
+        digitalWrite(TLED, HIGH);
+        delay(200);
+        digitalWrite(TLED, LOW);
+        delay(200);
+        digitalWrite(TLED, HIGH);
+        delay(200);
+        digitalWrite(TLED, LOW);
+        delay(200);
+      }
       Serial.print("RSSI: ");
       Serial.println(rf95.lastRssi(), DEC);    
     }

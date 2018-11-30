@@ -4,10 +4,15 @@
 #include <SPI.h>
 #include <RH_RF95.h>
 #include <SoftwareSerial.h>
- 
+
+// miso 12
+// mosi 11
+// sck 13
 #define RFM95_CS  4
 #define RFM95_RST 2
 #define RFM95_INT 3
+
+#define TLED 8
 
 #define GPS_TX 7
 #define GPS_RX 8
@@ -31,6 +36,11 @@ void setup()
   // initialize pins
   pinMode(RFM95_RST, OUTPUT);
   digitalWrite(RFM95_RST, HIGH);
+
+  pinMode(TLED, OUTPUT);
+  digitalWrite(TLED, HIGH);
+  delay(500);
+  digitalWrite(TLED, LOW);
  
   // wait for serial
   while (!Serial);
@@ -102,6 +112,17 @@ void loop()
         {
           Serial.print("Got reply: ");
           Serial.println((char*)buf);
+          String str((char*)buf);
+          if (str.startsWith("LED")) {
+            digitalWrite(TLED, HIGH);
+            delay(200);
+            digitalWrite(TLED, LOW);
+            delay(200);
+            digitalWrite(TLED, HIGH);
+            delay(200);
+            digitalWrite(TLED, LOW);
+            delay(200);
+          }
           Serial.print("RSSI: ");
           Serial.println(rf95.lastRssi(), DEC);    
         }
