@@ -85,7 +85,7 @@ void loop()
   Serial.println("Sending to rf95_server");
   // Send a message to rf95_server
   
-  char radiopacket[20] = "CMD other stuff     ";
+  char radiopacket[20] = "CMD other stuff    ";
   Serial.print("Sending "); Serial.println(radiopacket);
   radiopacket[19] = 0;
   
